@@ -1,0 +1,81 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes"><title>Rusty's Workout Player</title>
+<style>
+body{font-family:-apple-system,system-ui,sans-serif;background:#111;color:#eee;margin:0;padding:16px;max-width:520px;margin:auto}
+h1{font-size:20px;margin:4px 0 12px}
+.days button,.ctl button{background:#222;color:#eee;border:1px solid #444;border-radius:10px;padding:10px 12px;margin:4px;font-size:15px}
+.days button.on{background:#2d6cdf;border-color:#2d6cdf}
+.card{background:#1c1c1c;border-radius:14px;padding:18px;margin-top:12px}
+.ex{font-size:24px;font-weight:700;margin:6px 0}
+.meta{color:#aaa;font-size:15px}
+.big{font-size:56px;font-weight:800;text-align:center;margin:14px 0}
+.ctl{text-align:center}
+.ctl button.go{background:#1f9d55;border-color:#1f9d55;font-size:18px;padding:14px 22px}
+a{color:#6aa8ff}
+.list{font-size:14px;color:#bbb;margin-top:14px}
+.list div{padding:4px 0;border-bottom:1px solid #2a2a2a}
+.list .cur{color:#fff;font-weight:700}
+.note{font-size:13px;color:#888;margin-top:14px}
+</style></head><body>
+<h1>Rusty's Workout Player</h1>
+<div class="days" id="days"></div>
+<div class="card">
+<div class="meta" id="pos"></div>
+<div class="ex" id="ex"></div>
+<div class="meta" id="detail"></div>
+<div class="meta"><a id="demo" target="_blank">Watch a form demo</a></div>
+<div class="big" id="timer"></div>
+<div class="ctl">
+<button onclick="prev()">◀ Back</button>
+<button class="go" id="main" onclick="mainBtn()">Set done</button>
+<button onclick="next()">Skip ▶</button>
+</div>
+<div class="list" id="list"></div>
+<div class="note">Pick weights you could lift 2–3 more reps with. When you hit the top of the rep range on every set, add 5 lb on the barbell or go up one dumbbell size.</div>
+</div>
+<script>
+const W=[5*60,"Warm-up: 5 min bike or elliptical",1,"Easy pace, then 1 round of the listed warm-up moves",0,"5 minute bike warm-up"];
+function ex(n,s,r,rest,q,timed){return{n,s,r,rest,q,timed}}
+const D={
+"Mon: Upper A":[ex("Warm-up: bike or elliptical",1,"5 min",0,"bike warm up",300),ex("Pull-aparts, arm circles, 5 push-ups",1,"1 round",0,"band pull apart"),
+ex("Dumbbell bench press",3,"8–10",90,"dumbbell bench press form"),ex("Chest-supported dumbbell row",3,"10",90,"chest supported dumbbell row incline bench"),
+ex("Seated dumbbell overhead press",3,"8–10",90,"seated dumbbell shoulder press form"),ex("Lat pulldown",3,"10–12",60,"lat pulldown form"),
+ex("Lateral raises",2,"12–15",60,"dumbbell lateral raise form"),ex("Cable triceps pushdown",2,"12",60,"cable triceps pushdown form"),
+ex("Stretch: doorway pec + thoracic rotations",1,"5 min",0,"thoracic rotation stretch",300)],
+"Tue: Lower A":[ex("Warm-up: bike or elliptical",1,"5 min",0,"bike warm up",300),ex("Bodyweight squats, hip openers, glute bridges",1,"1 round",0,"hip opener warm up"),
+ex("Barbell back squat (safeties set)",3,"6–8",120,"barbell back squat form"),ex("Romanian deadlift",3,"8–10",90,"romanian deadlift form"),
+ex("Bulgarian split squat",2,"8 each leg",90,"bulgarian split squat form"),ex("Leg curl",2,"12",60,"seated leg curl form"),
+ex("Dead bug",3,"8 each side",45,"dead bug exercise"),ex("Stretch: hip flexor, hamstring, figure-4",1,"5 min",0,"hip flexor stretch",300)],
+"Thu: Upper B":[ex("Warm-up: bike or elliptical",1,"5 min",0,"bike warm up",300),ex("Pull-aparts, arm circles, 5 push-ups",1,"1 round",0,"band pull apart"),
+ex("Close-grip lat pulldown (or chin-ups)",3,"8–10",90,"close grip lat pulldown"),ex("Incline dumbbell press",3,"8–10",90,"incline dumbbell press form"),
+ex("One-arm dumbbell row",3,"10 each side",60,"one arm dumbbell row form"),ex("Cable face pulls",3,"12–15",60,"cable face pull form"),
+ex("Dumbbell curls",2,"12",60,"dumbbell curl form"),ex("Dips (or bench push-ups)",2,"stop short of failure",60,"bench dips vs parallel dips form"),
+ex("Stretch: lats, shoulders, thoracic",1,"5 min",0,"lat stretch",300)],
+"Fri: Lower B":[ex("Warm-up: bike or elliptical",1,"5 min",0,"bike warm up",300),ex("Hip hinges, glute bridges, leg swings",1,"1 round",0,"hip hinge drill"),
+ex("Conventional deadlift (moderate)",3,"5",120,"conventional deadlift form"),ex("Box step-ups or leg press",3,"10 each leg",90,"dumbbell step up form"),
+ex("Hip thrust / barbell glute bridge",3,"10",90,"barbell hip thrust form"),ex("Back extension (Roman chair)",2,"12",60,"back extension roman chair form"),
+ex("Side plank",3,"30 s each side",30,"side plank form",30),ex("Stretch: hamstrings, hip flexors, adductors",1,"5 min",0,"adductor stretch",300)],
+"Home backup":[ex("Push-ups (hands elevated if needed)",3,"10–15",30,"push up form"),ex("Reverse lunges",3,"10 each leg",30,"reverse lunge form"),
+ex("Pike push-ups",3,"8",30,"pike push up form"),ex("Single-leg glute bridge",3,"10 each leg",30,"single leg glute bridge"),
+ex("Towel/doorframe row or Y-T-W raises",3,"10",30,"prone YTW raises"),ex("Plank",3,"30–45 s",60,"plank form",40),
+ex("Mobility: world's greatest stretch, 90/90, cat-cow",1,"5 min",0,"worlds greatest stretch",300)]};
+let day=Object.keys(D)[0],i=0,set=1,t=null,left=0,mode="work";
+const $=id=>document.getElementById(id);
+function beep(){try{const a=new (window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator();o.connect(a.destination);o.frequency.value=880;o.start();setTimeout(()=>o.stop(),400)}catch(e){}if(navigator.vibrate)navigator.vibrate(300)}
+function stop(){clearInterval(t);t=null}
+function fmt(s){return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")}
+function run(sec,done){stop();left=sec;$("timer").textContent=fmt(left);t=setInterval(()=>{left--;$("timer").textContent=fmt(Math.max(left,0));if(left<=0){stop();beep();done()}},1000)}
+function render(){const L=D[day],e=L[i];$("pos").textContent=day+" · exercise "+(i+1)+" of "+L.length;$("ex").textContent=e.n;
+$("detail").textContent="Set "+set+" of "+e.s+" · "+e.r+(e.rest?" · rest "+e.rest+"s":"");
+$("demo").href="https://www.youtube.com/results?search_query="+encodeURIComponent(e.q);
+if(mode=="work"){$("timer").textContent=e.timed?fmt(e.timed):"GO";$("main").textContent=e.timed?"Start timer":"Set done"}
+$("list").innerHTML=L.map((x,k)=>`<div class="${k==i?'cur':''}">${k+1}. ${x.n} — ${x.s}×${x.r}</div>`).join("");
+$("days").innerHTML=Object.keys(D).map(k=>`<button class="${k==day?'on':''}" onclick="pick('${k}')">${k}</button>`).join("")}
+function pick(k){stop();day=k;i=0;set=1;mode="work";render()}
+function finishSet(){const e=D[day][i];if(set<e.s){set++;if(e.rest){mode="rest";$("main").textContent="Skip rest";$("detail").textContent="Rest — next: set "+set+" of "+e.s;run(e.rest,()=>{mode="work";render()})}else render()}else next()}
+function mainBtn(){const e=D[day][i];if(mode=="rest"){stop();mode="work";render();return}
+if(e.timed&&!t){$("main").textContent="Running…";run(e.timed,finishSet)}else if(!e.timed)finishSet()}
+function next(){stop();mode="work";set=1;if(i<D[day].length-1)i++;else{$("ex").textContent="Workout done 💪";$("timer").textContent="";return}render()}
+function prev(){stop();mode="work";set=1;if(i>0)i--;render()}
+render();
+</script></body></html>
